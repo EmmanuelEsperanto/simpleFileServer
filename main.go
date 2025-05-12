@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"strings"
@@ -24,10 +25,9 @@ func noCacheHandler(h http.Handler) http.Handler {
 		w.Header().Set("Pragma", "no-cache")
 		w.Header().Set("Expires", "0")
 
-		token := extractTokenFromRequest(r)
-		if token == "" || !isValidToken(token) {
+		token, err := extractTokenFromRequest(r)
+		if err != nil || !isValidToken(token) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			log.Println("Неправильный токен: ")
 			return
 		}
 		log.Println("Успешно ответили на запрос")
@@ -35,12 +35,16 @@ func noCacheHandler(h http.Handler) http.Handler {
 	})
 }
 
-func extractTokenFromRequest(r *http.Request) string {
+func extractTokenFromRequest(r *http.Request) (string, error) {
 	authHeader := r.Header.Get("Authorization")
-	if strings.HasPrefix(authHeader, "Bearer ") {
-		return strings.TrimPrefix(authHeader, "Bearer ")
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return "", errors.New("No token found in request header")
 	}
-	return ""
+	extractedToken := strings.TrimPrefix(authHeader, "Bearer ")
+	if extractedToken != "" {
+		return extractedToken, nil
+	}
+	return "", errors.New("No token found in request header")
 }
 
 func isValidToken(token string) bool {
